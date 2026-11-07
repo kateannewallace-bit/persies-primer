@@ -1,0 +1,16 @@
+{
+  "name": "Persie's Primer",
+  "short_name": "Persie reads",
+  "description": "A first reader for a three-year-old.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#2b1a21",
+  "theme_color": "#2b1a21",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
