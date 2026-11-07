@@ -1,5 +1,5 @@
 // Offline support. Bump VERSION whenever app files change so devices pick up the update.
-const VERSION = 'persies-primer-v1';
+const VERSION = 'persies-primer-v2';
 const SHELL = [
   './', 'index.html', 'styles.css', 'lessons.js', 'scene.js', 'app.js', 'config.js', 'manifest.webmanifest',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',

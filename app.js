@@ -17,7 +17,7 @@ const wordsUpTo = n => LESSONS.filter(L => L.n <= n).flatMap(wordsOf);
 const sentencesUpTo = n => LESSONS.filter(L => L.n <= n).flatMap(L => (L.sentences || []).map(s => ({ s, n: L.n })));
 const lessonOfWord = w => (LESSONS.find(L => wordsOf(L).includes(w)) || {}).n || 1;
 // Words the speech voice gets wrong get a spoken spelling.
-const SAY_AS = { am: 'am', ax: 'axe', Al: 'Al', Hal: 'Hal' };
+const SAY_AS = { an: 'Ann', ax: 'axe' };
 const sayAs = w => SAY_AS[w] || w;
 // Letters spoken for the grown-up when a letter choice is right ("t, at").
 const LETTER_SAY = { a: 'ay', x: 'ex' };
@@ -157,14 +157,20 @@ function chosenVoice() {
   }
   return null;
 }
+// A list speaks each part on its own, so a reading word is never run into the words around it
+// ("Find the word." … "an.", not "find the wordan"). Word parts ({ w }) are said a little slower.
 function say(t, rate = 0.85) {
   if (!canSpeak || !t) return;
   try {
     speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(t), v = chosenVoice();
-    if (v) { u.voice = v; u.lang = v.lang; }
-    u.rate = rate; u.pitch = 1.08;
-    speechSynthesis.speak(u);
+    const v = chosenVoice();
+    for (const part of [].concat(t)) {
+      const isWord = typeof part === 'object';
+      const u = new SpeechSynthesisUtterance(isWord ? `${sayAs(part.w)}.` : part);
+      if (v) { u.voice = v; u.lang = v.lang; }
+      u.rate = isWord ? Math.min(rate, 0.72) : rate; u.pitch = 1.08;
+      speechSynthesis.speak(u);
+    }
   } catch (e) {}
 }
 // Questions follow the read-aloud setting; the word itself is always spoken in Find and Finish (hearing it is the game).
@@ -215,7 +221,7 @@ function makeFind(avoid, givenWord) {
     picks = shuffle(near).slice(0, nChoices - 1);
   }
   const choices = shuffle([{ text: w, ok: true }, ...picks.map(t => ({ text: t, ok: false }))]);
-  return { game: 'find', item: { text: w, n: lessonOfWord(w) }, key: lc(w), choices, speak: `Find the word ${sayAs(w)}.`, explain: w };
+  return { game: 'find', item: { text: w, n: lessonOfWord(w) }, key: lc(w), choices, speak: ['Find the word:', { w }], explain: w };
 }
 const SKIP_FIND = new Set(['Jan']);
 function makeFinish(avoid, givenWord) {
@@ -230,7 +236,7 @@ function makeFinish(avoid, givenWord) {
   const n = level === 1 ? 2 : level === 4 ? 4 : 3;
   const pool = shuffle(letters.filter(ch => ch !== ans && !/[aeiou]/.test(ch)));
   const choices = shuffle([ans, ...pool.slice(0, n - 1)]).map(ch => ({ text: ch, ok: ch === ans }));
-  return { game: 'finish', item: { text: w, n: lessonOfWord(w) }, key: lc(w), at, choices, speak: `${sayAs(w)}. Which letter is missing?`, explain: w };
+  return { game: 'finish', item: { text: w, n: lessonOfWord(w) }, key: lc(w), at, choices, speak: [{ w }, 'Which letter is missing?'], explain: w };
 }
 const MAKERS = { read: makeRead, find: makeFind, finish: makeFinish };
 
@@ -268,7 +274,7 @@ function gotIt(p) {
   p.praise = first ? pick(PRAISE) : 'Yes, that\'s it!';
   record(p, first);
   render();
-  say(`${p.praise} ${p.game === 'read' ? sayAs(p.explain) : `${sayAs(p.explain)}.`}`);
+  say([p.praise, { w: p.explain }]);
   const stage = document.querySelector('.stage');
   // the crab tries to eat the lizard... too big!
   setTimeout(() => stage && Scene.tryEat(stage, tryN++, { bubble: () => say('Too big!', 0.95) }), 350);
@@ -277,7 +283,7 @@ function reveal(p) {
   p.done = true; p.revealed = true;
   record(p, false);
   render();
-  say(`Here it is. ${sayAs(p.explain)}.`);
+  say(['Here it is:', { w: p.explain }]);
 }
 function answer(idx) {
   const p = sess.probs[sess.i];
@@ -285,13 +291,13 @@ function answer(idx) {
   if (p.choices[idx].ok) { gotIt(p); return; }
   p.wrong.push(idx); p.tries++;
   if (p.tries >= 2 || p.wrong.length >= p.choices.length - 1) reveal(p);
-  else { p.nudge = 'Hmm, look again.'; say(p.game === 'find' ? `Look again. Find ${sayAs(p.explain)}.` : `Look again. ${sayAs(p.explain)}.`); render(true); }
+  else { p.nudge = 'Hmm, look again.'; say(p.game === 'find' ? ['Look again. Find the word:', { w: p.explain }] : ['Look again:', { w: p.explain }]); render(true); }
 }
 function help() {
   const p = sess.probs[sess.i];
   if (p.done) return;
   p.helped = true;
-  say(sayAs(p.explain), 0.7);
+  say([{ w: p.explain }], 0.7);
   render();
 }
 function record(p, first) {
@@ -569,7 +575,7 @@ app.addEventListener('click', e => {
   else if (act === 'ok') { const p = sess.probs[sess.i]; if (!p.done) gotIt(p); }
   else if (act === 'help') help();
   else if (act === 'next') next();
-  else if (act === 'say') { const p = sess.probs[sess.i]; say(p.game === 'read' ? p.speak : p.speak); }
+  else if (act === 'say') { const p = sess.probs[sess.i]; say(p.speak); }
   else if (act === 'replay') { const stage = document.querySelector('.stage'); Scene.tryEat(stage, tryN++, { bubble: () => say('Too big!', 0.95) }).then(() => { if (stage.isConnected && screen === 'done') finale(); }); }
   else if (act === 'home') { screen = 'home'; confirmWipe = false; wiped = false; render(); }
   else if (act === 'parent') { screen = 'parent'; render(); }
@@ -580,7 +586,7 @@ app.addEventListener('click', e => {
   else if (act === 'per') { state.perSession = +b.dataset.n; save(); render(); }
   else if (act === 'read') { state.voice = b.dataset.v; save(); render(); }
   else if (act === 'sfx') { state.sfx = b.dataset.v; save(); render(); if (state.sfx === 'on') Scene.Sfx.gulp(); }
-  else if (act === 'try-voice') say(`${greet('Hello')} Find the word at.`);
+  else if (act === 'try-voice') say([greet('Hello'), 'Find the word:', { w: 'at' }]);
   else if (act === 'sync-new') { startSync(newCode()); render(); }
   else if (act === 'sync-join') {
     const code = cleanCode(document.getElementById('join-code')?.value || '');
